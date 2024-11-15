@@ -10,3 +10,5 @@ $ cat setenv.set
 $ . ./setenv.set
 $ cargo run
 ```
+
+![alt text](btm-pg.png "btm-pg image")
