@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 // Fetch pg_stat_all_tables data
 async fn fetch_pg_stat_all_tables(client: &tokio_postgres::Client) -> Result<Vec<TableRow>, Box<dyn Error>> {
     let rows = client.query(
-        "SELECT schemaname, relname, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup FROM pg_stat_all_tables ORDER BY n_tup_ins desc LIMIT 15",
+        "SELECT schemaname, relname, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup FROM pg_stat_all_tables ORDER BY n_tup_hot_upd desc LIMIT 25",
         &[],
     ).await?;
 
