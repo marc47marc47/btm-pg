@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // 4. Main event loop
     let mut interval = time::interval(Duration::from_secs(2));
     loop {
-        let rows = fetch_pg_stat_activity(&client).await?;
+        let rows = fetch_pg_stat_all_tables(&client).await?;
         terminal.draw(|f| {
             let size = f.area();
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .split(size);
 
             // Title
-            let title = Paragraph::new("PostgreSQL Monitor").block(
+            let title = Paragraph::new("PostgreSQL Table Statistics Monitor").block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title("Dashboard")
@@ -61,15 +61,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
             );
             f.render_widget(title, chunks[0]);
 
-            // Data Table
-            let table = Table::new(rows, [
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(20),
-                Constraint::Percentage(10),
-                Constraint::Percentage(50),
+            // Data Table with Headers
+            let header = TableRow::new(vec![
+                "Schema", "Table", "Index Fetch", "Tuples Inserted",
+                "Tuples Updated", "Tuples Deleted", "Hot Updates", "Live Tuples", "Dead Tuples",
             ])
-            .block(Block::default().borders(Borders::ALL).title("pg_stat_activity"));
+            .style(Style::default().fg(Color::Green).add_modifier(ratatui::style::Modifier::BOLD));
+
+            let table = Table::new(rows, [
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                ])
+                .header(header)
+                .block(Block::default().borders(Borders::ALL).title("pg_stat_all_tables"));
+
             f.render_widget(table, chunks[1]);
         })?;
 
@@ -90,21 +102,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// Fetch pg_stat_activity data
-async fn fetch_pg_stat_activity(client: &tokio_postgres::Client) -> Result<Vec<TableRow>, Box<dyn Error>> {
+// Fetch pg_stat_all_tables data
+async fn fetch_pg_stat_all_tables(client: &tokio_postgres::Client) -> Result<Vec<TableRow>, Box<dyn Error>> {
     let rows = client.query(
-        "SELECT pid, usename, datname, state, query FROM pg_stat_activity ORDER BY pid LIMIT 10",
+        "SELECT schemaname, relname, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup FROM pg_stat_all_tables ORDER BY n_tup_ins desc LIMIT 15",
         &[],
     ).await?;
+
     Ok(rows
         .iter()
         .map(|row| {
             TableRow::new(vec![
-                row.get::<_, i32>("pid").to_string(),
-                row.get::<_, &str>("usename").to_string(),
-                row.get::<_, &str>("datname").to_string(),
-                row.get::<_, &str>("state").to_string(),
-                row.get::<_, &str>("query").to_string(),
+                row.get::<_, &str>("schemaname").to_string(),
+                row.get::<_, &str>("relname").to_string(),
+                row.get::<_, Option<i64>>("idx_tup_fetch").unwrap_or(0).to_string(),
+                row.get::<_, Option<i64>>("n_tup_ins").unwrap_or(0).to_string(),
+                row.get::<_, Option<i64>>("n_tup_upd").unwrap_or(0).to_string(),
+                row.get::<_, Option<i64>>("n_tup_del").unwrap_or(0).to_string(),
+                row.get::<_, Option<i64>>("n_tup_hot_upd").unwrap_or(0).to_string(),
+                row.get::<_, Option<i64>>("n_live_tup").unwrap_or(0).to_string(),
+                row.get::<_, Option<i64>>("n_dead_tup").unwrap_or(0).to_string(),
             ])
         })
         .collect())
